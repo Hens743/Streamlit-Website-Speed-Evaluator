@@ -2,7 +2,6 @@ ffmpeg
 libgl1-mesa-glx
 libglib2.0-0
 libxrender-dev
-chromium-browser
 chromium-chromedriver
 libglib2.0-0
 libnss3
