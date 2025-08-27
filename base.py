@@ -1,9 +1,11 @@
 import streamlit as st
 from selenium import webdriver
+from selenium.webdriver.chrome.service import Service as ChromeService
 from selenium.webdriver.chrome.options import Options as ChromeOptions
 from selenium.webdriver.firefox.options import Options as FirefoxOptions
 from selenium.webdriver.edge.options import Options as EdgeOptions
 import pandas as pd
+import os
 
 def get_website_speed(url, browser_name):
     """
@@ -13,18 +15,22 @@ def get_website_speed(url, browser_name):
     try:
         # --- Headless Browser Setup ---
         # This configures the browser to run in the background without a visible UI.
-        # Added extra arguments for stability in cloud/container environments.
         if browser_name == "Chrome":
             options = ChromeOptions()
             options.add_argument("--headless")
             options.add_argument("--no-sandbox")
             options.add_argument("--disable-dev-shm-usage")
-            driver = webdriver.Chrome(options=options)
+            # Explicitly point to the chromedriver installed via packages.txt
+            service = ChromeService(executable_path="/usr/bin/chromedriver")
+            driver = webdriver.Chrome(service=service, options=options)
         elif browser_name == "Firefox":
+            # Firefox setup remains the same as it's often less problematic
             options = FirefoxOptions()
             options.add_argument("--headless")
             driver = webdriver.Firefox(options=options)
         elif browser_name == "Edge":
+            # Note: Edge support on Streamlit Cloud can be less stable.
+            # This setup is experimental.
             options = EdgeOptions()
             options.add_argument("--headless")
             options.add_argument("--no-sandbox")
@@ -36,14 +42,12 @@ def get_website_speed(url, browser_name):
         driver.get(url)
 
         # --- Use Navigation Timing API for Core Metrics ---
-        # This JavaScript API provides detailed performance timing data.
         timing_info = driver.execute_script("return window.performance.timing;")
-        navigation_start = timing_info['navigationStart']
-        response_start = timing_info['responseStart']
-        dom_complete = timing_info['domComplete']
+        navigation_start = timing_info.get('navigationStart', 0)
+        response_start = timing_info.get('responseStart', 0)
+        dom_complete = timing_info.get('domComplete', 0)
 
-        # Ensure the page has actually loaded before calculating
-        if dom_complete == 0:
+        if dom_complete == 0 or navigation_start == 0:
              return {"Error": "Page did not finish loading or timing data is unavailable."}
 
         backend_performance = response_start - navigation_start
@@ -51,17 +55,15 @@ def get_website_speed(url, browser_name):
         total_load_time = dom_complete - navigation_start
 
         # --- Get Detailed Resource Timings ---
-        # Fetches performance data for every single asset (CSS, JS, image, etc.)
         resource_timings = driver.execute_script("return window.performance.getEntriesByType('resource');")
 
-        # Process resource data for analysis
         resource_data = []
         for resource in resource_timings:
             resource_data.append({
-                "Name": resource['name'].split('/')[-1], # Get just the filename
-                "URL": resource['name'],
-                "Type": resource['initiatorType'],
-                "Duration (ms)": resource['duration']
+                "Name": resource.get('name', '').split('/')[-1],
+                "URL": resource.get('name', ''),
+                "Type": resource.get('initiatorType', 'unknown'),
+                "Duration (ms)": resource.get('duration', 0)
             })
 
         return {
@@ -85,7 +87,9 @@ url = st.text_input("Enter the URL to evaluate (e.g., https://www.google.com):",
 
 if st.button("Analyze Website Performance"):
     if url:
-        browsers_to_test = ["Chrome", "Firefox", "Edge"]
+        # Focusing on Chrome and Firefox as they are most reliable on Streamlit Cloud
+        browsers_to_test = ["Chrome", "Firefox"] 
+        all_results = {}
         
         for browser in browsers_to_test:
             st.markdown(f"---")
@@ -93,33 +97,59 @@ if st.button("Analyze Website Performance"):
 
             with st.spinner(f"Testing on {browser}... This may take a moment."):
                 result = get_website_speed(url, browser)
+                all_results[browser] = result
 
             if "Error" in result:
                 st.error(f"Could not complete analysis on {browser}: {result['Error']}")
                 continue
 
-            # --- Display Results ---
             col1, col2, col3 = st.columns(3)
-            col1.metric("Backend Performance", f"{result['Backend Performance (ms)']} ms")
-            col2.metric("Frontend Performance", f"{result['Frontend Performance (ms)']} ms")
-            col3.metric("Total Load Time", f"{result['Total Page Load Time (ms)']} ms")
+            col1.metric("Backend Performance", f"{result.get('Backend Performance (ms)', 0)} ms")
+            col2.metric("Frontend Performance", f"{result.get('Frontend Performance (ms)', 0)} ms")
+            col3.metric("Total Load Time", f"{result.get('Total Page Load Time (ms)', 0)} ms")
 
-            if result["Resource Data"]:
+            if result.get("Resource Data"):
                 df = pd.DataFrame(result["Resource Data"])
                 
-                st.subheader("Resource Load Time by Type")
-                
-                # --- Bar Chart for Resource Types ---
-                type_summary = df.groupby("Type")["Duration (ms)"].sum().sort_values(ascending=False)
-                st.bar_chart(type_summary)
-                st.markdown("This chart shows the total time spent loading each type of resource (e.g., scripts, images, CSS).")
+                if not df.empty:
+                    st.subheader("Resource Load Time by Type")
+                    type_summary = df.groupby("Type")["Duration (ms)"].sum().sort_values(ascending=False)
+                    st.bar_chart(type_summary)
+                    st.markdown("This chart shows the total time spent loading each type of resource.")
 
-                # --- Table for Slowest Resources ---
-                st.subheader("Top 5 Slowest Resources")
-                slowest_resources = df.sort_values(by="Duration (ms)", ascending=False).head(5)
-                st.dataframe(slowest_resources[["Name", "Type", "Duration (ms)"]], use_container_width=True)
-                st.markdown("This table highlights the individual assets that took the longest to load.")
+                    st.subheader("Top 5 Slowest Resources")
+                    slowest_resources = df.sort_values(by="Duration (ms)", ascending=False).head(5)
+                    st.dataframe(slowest_resources[["Name", "Type", "Duration (ms)"]], use_container_width=True)
+                    st.markdown("This table highlights the individual assets that took the longest to load.")
+                else:
+                    st.warning("No detailed resource data was collected for this page.")
             else:
                 st.warning("No detailed resource data was collected for this page.")
+
+        # --- Comparison Summary Section ---
+        st.markdown("---")
+        st.header("Browser Performance Comparison")
+
+        summary_data = []
+        for browser, result in all_results.items():
+            if "Error" not in result:
+                summary_data.append({
+                    "Browser": browser,
+                    "Total Load Time (ms)": result.get('Total Page Load Time (ms)', 0),
+                    "Backend Performance (ms)": result.get('Backend Performance (ms)', 0),
+                    "Frontend Performance (ms)": result.get('Frontend Performance (ms)', 0)
+                })
+        
+        if summary_data:
+            summary_df = pd.DataFrame(summary_data).set_index("Browser")
+            
+            st.subheader("Comparison Chart: Total Load Time")
+            st.bar_chart(summary_df[["Total Load Time (ms)"]])
+            
+            st.subheader("Detailed Comparison Table")
+            st.dataframe(summary_df)
+        else:
+            st.warning("No successful analyses to compare.")
+
     else:
         st.warning("Please enter a valid URL to begin the analysis.")
