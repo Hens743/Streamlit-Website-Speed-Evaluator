@@ -13,6 +13,7 @@ def get_website_speed(url, browser_name):
     try:
         # --- Headless Browser Setup ---
         # This configures the browser to run in the background without a visible UI.
+        # Added extra arguments for stability in cloud/container environments.
         if browser_name == "Chrome":
             options = ChromeOptions()
             options.add_argument("--headless")
