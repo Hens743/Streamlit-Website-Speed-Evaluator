@@ -85,8 +85,8 @@ url = st.text_input("Enter the URL to evaluate (e.g., https://www.google.com):",
 
 if st.button("Analyze Website Performance"):
     if url:
-        # Focusing on Chrome and Firefox as they are most reliable on Streamlit Cloud
-        browsers_to_test = ["Chrome", "Firefox"] 
+        # Re-enabling all browsers for testing
+        browsers_to_test = ["Chrome", "Firefox", "Edge"] 
         
         for browser in browsers_to_test:
             st.markdown(f"---")
