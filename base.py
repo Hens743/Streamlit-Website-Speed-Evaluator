@@ -119,7 +119,7 @@ if st.button("Analyze Website Performance"):
 
                     st.subheader("Top 5 Slowest Resources")
                     slowest_resources = df.sort_values(by="Duration (ms)", ascending=False).head(5)
-                    st.dataframe(slowest_resources[["Name", "Type", "Duration (ms)"]], use_container_width=True)
+                    st.dataframe(slowest_resources[["Name", "Type", "Duration (ms)"]], width='stretch')
                     st.markdown("This table highlights the individual assets that took the longest to load.")
                 else:
                     st.warning("No detailed resource data was collected for this page.")
