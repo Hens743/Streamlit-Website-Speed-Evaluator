@@ -1,6 +1,5 @@
 import streamlit as st
 from selenium import webdriver
-from selenium.webdriver.chrome.service import Service as ChromeService
 from selenium.webdriver.chrome.options import Options as ChromeOptions
 from selenium.webdriver.firefox.options import Options as FirefoxOptions
 from selenium.webdriver.edge.options import Options as EdgeOptions
@@ -20,9 +19,8 @@ def get_website_speed(url, browser_name):
             options.add_argument("--headless")
             options.add_argument("--no-sandbox")
             options.add_argument("--disable-dev-shm-usage")
-            # Explicitly point to the chromedriver installed via packages.txt
-            service = ChromeService(executable_path="/usr/bin/chromedriver")
-            driver = webdriver.Chrome(service=service, options=options)
+            # Let Selenium's new manager handle the driver automatically
+            driver = webdriver.Chrome(options=options)
         elif browser_name == "Firefox":
             # Firefox setup remains the same as it's often less problematic
             options = FirefoxOptions()
