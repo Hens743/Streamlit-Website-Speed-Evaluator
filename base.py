@@ -4,6 +4,7 @@ from selenium.webdriver.chrome.options import Options as ChromeOptions
 from selenium.webdriver.firefox.options import Options as FirefoxOptions
 from selenium.webdriver.edge.options import Options as EdgeOptions
 import pandas as pd
+import platform
 
 # --- Website Speed Analyzer ---
 def get_website_speed(url, browser_name):
@@ -27,7 +28,8 @@ def get_website_speed(url, browser_name):
             options.add_argument("--disable-dev-shm-usage")
             driver = webdriver.Edge(options=options)
         elif browser_name == "Safari":
-            # Safari does not support headless mode, and only works on macOS with SafariDriver installed.
+            if platform.system() != "Darwin":
+                return {"Error": "Safari testing is only supported on macOS with SafariDriver enabled."}
             driver = webdriver.Safari()
         else:
             return {"Error": "Unsupported browser selected."}
@@ -125,7 +127,7 @@ if st.button("Analyze Website Performance"):
 
                     st.subheader("Top 5 Slowest Resources")
                     slowest_resources = df.sort_values(by="Duration (ms)", ascending=False).head(5)
-                    st.dataframe(slowest_resources[["Name", "Type", "Duration (ms)"]], use_container_width=True)
+                    st.dataframe(slowest_resources[["Name", "Type", "Duration (ms)"]], width="stretch")
                     st.markdown("This table highlights the individual assets that took the longest to load.")
                 else:
                     st.warning("No detailed resource data was collected for this page.")
@@ -139,11 +141,31 @@ if st.button("Analyze Website Performance"):
 
             comp_df = pd.DataFrame(comparison_results)
 
+            # Add qualitative assessment
+            def assess_speed(value):
+                if value < 1000:
+                    return "Excellent"
+                elif value <= 3000:
+                    return "Acceptable"
+                else:
+                    return "Slow"
+
+            comp_df["Assessment"] = comp_df["Total (ms)"].apply(assess_speed)
+
             st.subheader("Total Page Load Time Comparison")
             st.bar_chart(comp_df.set_index("Browser")["Total (ms)"])
 
             st.subheader("Detailed Performance Metrics")
-            st.dataframe(comp_df.set_index("Browser"), use_container_width=True)
+            st.dataframe(comp_df.set_index("Browser"), width="stretch")
+
+            # CSV Download Button
+            csv = comp_df.to_csv(index=False).encode("utf-8")
+            st.download_button(
+                label="Download Comparison as CSV",
+                data=csv,
+                file_name="browser_comparison.csv",
+                mime="text/csv"
+            )
 
     else:
         st.warning("Please enter a valid URL to begin the analysis.")
