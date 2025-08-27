@@ -79,15 +79,22 @@ st.markdown("Enter a website URL and select a browser to measure loading speed a
 
 url = st.text_input("Enter the URL to evaluate (e.g., https://www.google.com):", "https://streamlit.io")
 
+# Dynamically build browser list (exclude Safari if not on macOS)
+browser_options = ["All Browsers", "Chrome", "Firefox", "Edge"]
+if platform.system() == "Darwin":
+    browser_options.append("Safari")
+
 browser_choice = st.selectbox(
     "Choose a browser for analysis:",
-    ["All Browsers", "Chrome", "Firefox", "Edge", "Safari"]
+    browser_options
 )
 
 if st.button("Analyze Website Performance"):
     if url:
         if browser_choice == "All Browsers":
-            browsers_to_test = ["Chrome", "Firefox", "Edge", "Safari"]
+            browsers_to_test = ["Chrome", "Firefox", "Edge"]
+            if platform.system() == "Darwin":
+                browsers_to_test.append("Safari")
         else:
             browsers_to_test = [browser_choice]
 
@@ -125,8 +132,8 @@ if st.button("Analyze Website Performance"):
                     st.bar_chart(type_summary)
                     st.markdown("This chart shows the total time spent loading each type of resource.")
 
-                    st.subheader("Top 5 Slowest Resources")
-                    slowest_resources = df.sort_values(by="Duration (ms)", ascending=False).head(5)
+                    st.subheader("Top 20 Slowest Resources")
+                    slowest_resources = df.sort_values(by="Duration (ms)", ascending=False).head(20)
                     st.dataframe(slowest_resources[["Name", "Type", "Duration (ms)"]], width="stretch")
                     st.markdown("This table highlights the individual assets that took the longest to load.")
                 else:
