@@ -79,20 +79,36 @@ url = st.text_input("Enter the URL to evaluate (e.g., https://www.google.com):",
 
 browser_choice = st.selectbox(
     "Choose a browser for analysis:",
-    ["Chrome", "Firefox", "Edge", "Safari"]
+    ["All Browsers", "Chrome", "Firefox", "Edge", "Safari"]
 )
 
 if st.button("Analyze Website Performance"):
     if url:
-        st.markdown("---")
-        st.header(f"Analysis for: {browser_choice}")
-
-        with st.spinner(f"Testing on {browser_choice}... This may take a moment."):
-            result = get_website_speed(url, browser_choice)
-
-        if "Error" in result:
-            st.error(f"Could not complete analysis on {browser_choice}: {result['Error']}")
+        if browser_choice == "All Browsers":
+            browsers_to_test = ["Chrome", "Firefox", "Edge", "Safari"]
         else:
+            browsers_to_test = [browser_choice]
+
+        comparison_results = []
+
+        for browser in browsers_to_test:
+            st.markdown("---")
+            st.header(f"Analysis for: {browser}")
+
+            with st.spinner(f"Testing on {browser}... This may take a moment."):
+                result = get_website_speed(url, browser)
+
+            if "Error" in result:
+                st.error(f"Could not complete analysis on {browser}: {result['Error']}")
+                continue
+
+            comparison_results.append({
+                "Browser": browser,
+                "Backend (ms)": result.get('Backend Performance (ms)', 0),
+                "Frontend (ms)": result.get('Frontend Performance (ms)', 0),
+                "Total (ms)": result.get('Total Page Load Time (ms)', 0)
+            })
+
             col1, col2, col3 = st.columns(3)
             col1.metric("Backend Performance", f"{result.get('Backend Performance (ms)', 0)} ms")
             col2.metric("Frontend Performance", f"{result.get('Frontend Performance (ms)', 0)} ms")
@@ -115,5 +131,19 @@ if st.button("Analyze Website Performance"):
                     st.warning("No detailed resource data was collected for this page.")
             else:
                 st.warning("No detailed resource data was collected for this page.")
+
+        # --- Comparison Section ---
+        if len(comparison_results) > 1:
+            st.markdown("---")
+            st.header("Browser Comparison Summary")
+
+            comp_df = pd.DataFrame(comparison_results)
+
+            st.subheader("Total Page Load Time Comparison")
+            st.bar_chart(comp_df.set_index("Browser")["Total (ms)"])
+
+            st.subheader("Detailed Performance Metrics")
+            st.dataframe(comp_df.set_index("Browser"), use_container_width=True)
+
     else:
         st.warning("Please enter a valid URL to begin the analysis.")
