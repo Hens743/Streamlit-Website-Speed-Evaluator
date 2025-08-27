@@ -89,7 +89,6 @@ if st.button("Analyze Website Performance"):
     if url:
         # Focusing on Chrome and Firefox as they are most reliable on Streamlit Cloud
         browsers_to_test = ["Chrome", "Firefox"] 
-        all_results = {}
         
         for browser in browsers_to_test:
             st.markdown(f"---")
@@ -97,7 +96,6 @@ if st.button("Analyze Website Performance"):
 
             with st.spinner(f"Testing on {browser}... This may take a moment."):
                 result = get_website_speed(url, browser)
-                all_results[browser] = result
 
             if "Error" in result:
                 st.error(f"Could not complete analysis on {browser}: {result['Error']}")
@@ -119,37 +117,11 @@ if st.button("Analyze Website Performance"):
 
                     st.subheader("Top 5 Slowest Resources")
                     slowest_resources = df.sort_values(by="Duration (ms)", ascending=False).head(5)
-                    st.dataframe(slowest_resources[["Name", "Type", "Duration (ms)"]], width='stretch')
+                    st.dataframe(slowest_resources[["Name", "Type", "Duration (ms)"]], use_container_width=True)
                     st.markdown("This table highlights the individual assets that took the longest to load.")
                 else:
                     st.warning("No detailed resource data was collected for this page.")
             else:
                 st.warning("No detailed resource data was collected for this page.")
-
-        # --- Comparison Summary Section ---
-        st.markdown("---")
-        st.header("Browser Performance Comparison")
-
-        summary_data = []
-        for browser, result in all_results.items():
-            if "Error" not in result:
-                summary_data.append({
-                    "Browser": browser,
-                    "Total Load Time (ms)": result.get('Total Page Load Time (ms)', 0),
-                    "Backend Performance (ms)": result.get('Backend Performance (ms)', 0),
-                    "Frontend Performance (ms)": result.get('Frontend Performance (ms)', 0)
-                })
-        
-        if summary_data:
-            summary_df = pd.DataFrame(summary_data).set_index("Browser")
-            
-            st.subheader("Comparison Chart: Total Load Time")
-            st.bar_chart(summary_df[["Total Load Time (ms)"]])
-            
-            st.subheader("Detailed Comparison Table")
-            st.dataframe(summary_df)
-        else:
-            st.warning("No successful analyses to compare.")
-
     else:
         st.warning("Please enter a valid URL to begin the analysis.")
