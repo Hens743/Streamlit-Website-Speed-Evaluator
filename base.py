@@ -119,7 +119,6 @@ if st.button("Analyze Website Performance"):
     elif not selected_browsers:
         st.warning("Please select at least one browser.")
     else:
-        # UPDATED: Store the full results for each browser for the final report
         all_results_data = []
 
         for browser in selected_browsers:
@@ -130,11 +129,9 @@ if st.button("Analyze Website Performance"):
                 st.error(f"Could not complete analysis: {result['Error']}")
                 continue
 
-            # Add browser name to result and append to our list
             result['browser'] = browser
             all_results_data.append(result)
             
-            # --- UI Display Code (same as before) ---
             st.subheader("Core Metrics")
             col1, col2 = st.columns(2)
             with col1:
@@ -167,7 +164,6 @@ if st.button("Analyze Website Performance"):
                                  width='stretch', hide_index=True,
                                  column_config={"Duration (ms)": st.column_config.NumberColumn(format="%d ms"), "Size (KB)": st.column_config.NumberColumn(format="%.1f KB")})
 
-        # --- Final Comparison Section ---
         if len(all_results_data) > 1:
             st.markdown("---")
             st.header("📊 Final Browser Performance Comparison")
@@ -181,7 +177,6 @@ if st.button("Analyze Website Performance"):
             styled_df = comparison_df.style.background_gradient(cmap='RdYlGn_r', axis=0)
             st.dataframe(styled_df, width='stretch')
 
-        # NEW: AI-Ready Technical Report Section
         if all_results_data:
             st.markdown("---")
             with st.expander("📋 AI-Ready Technical Report"):
@@ -202,11 +197,14 @@ if st.button("Analyze Website Performance"):
                     df = pd.DataFrame(res["Resource Data"])
                     if not df.empty:
                         report_string += f"- Total Resources Loaded: {len(df)}\n"
-                        slowest_resources = df.sort_values(by="Duration (ms)", ascending=False).head(5)
-                        report_string += "- **Top 5 Slowest Resources (Potential Bottlenecks):**\n"
-                        for i, row in slowest_resources.iterrows():
+                        # UPDATED: Changed from 5 to 10
+                        slowest_resources = df.sort_values(by="Duration (ms)", ascending=False).head(10)
+                        report_string += "- **Top 10 Slowest Resources (Potential Bottlenecks):**\n"
+                        # Loop with an index for numbered list
+                        for i, (_, row) in enumerate(slowest_resources.iterrows(), 1):
                             _, tip = get_resource_rating_and_tip(row)
-                            report_string += f"  1. **{row['Name']}** ({row['Type']}) - **Load Time:** {row['Duration (ms):.0f} ms, **Size:** {row['Size (KB)']:.1f} KB. **Suggestion:** {tip}\n"
+                            # FIXED: Corrected the f-string formatting for Duration
+                            report_string += f"  {i}. **{row['Name']}** ({row['Type']}) - **Load Time:** {row['Duration (ms)']:.0f} ms, **Size:** {row['Size (KB)']:.1f} KB. **Suggestion:** {tip}\n"
                     report_string += "\n"
                 
                 st.text_area("Copy this report to feed to a language model for improvement advice:", report_string, height=400)
