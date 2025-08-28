@@ -18,25 +18,31 @@ def is_valid_url(url):
 # --- Refactored function to set up the WebDriver ---
 def setup_driver(browser_name):
     """Initializes and returns a Selenium WebDriver for the specified browser."""
+    # Common arguments for headless Chrome-based browsers
+    headless_options = [
+        "--headless",
+        "--no-sandbox",
+        "--disable-dev-shm-usage",
+        "--disable-gpu",
+        "--window-size=1920,1080" # Helps with some sites
+    ]
+
     if browser_name == "Chrome":
         options = ChromeOptions()
-        options.add_argument("--headless")
-        options.add_argument("--no-sandbox")
-        options.add_argument("--disable-dev-shm-usage")
-        options.add_argument("--disable-gpu")
+        for arg in headless_options:
+            options.add_argument(arg)
         driver = webdriver.Chrome(options=options)
     elif browser_name == "Firefox":
         options = FirefoxOptions()
         options.add_argument("--headless")
         driver = webdriver.Firefox(options=options)
-    # Edge is commented out but can be enabled if needed
-    # elif browser_name == "Edge":
-    #     options = EdgeOptions()
-    #     options.add_argument("--headless")
-    #     options.add_argument("--no-sandbox")
-    #     options.add_argument("--disable-dev-shm-usage")
-    #     options.add_argument("--disable-gpu")
-    #     driver = webdriver.Edge(options=options)
+    elif browser_name == "Edge":
+        # WARNING: Edge is highly experimental on Streamlit Cloud and will
+        # likely fail due to the same missing dependencies as Chrome.
+        options = EdgeOptions()
+        for arg in headless_options:
+            options.add_argument(arg)
+        driver = webdriver.Edge(options=options)
     else:
         raise ValueError("Unsupported browser selected.")
     return driver
@@ -90,11 +96,18 @@ st.markdown("Enter a URL and select browsers to measure loading speed and analyz
 
 # --- UI Controls ---
 url = st.text_input("Enter the URL to evaluate:", "https://streamlit.io")
-available_browsers = ["Chrome", "Firefox"]
+
+# You can comment out browsers that fail in your environment
+available_browsers = [
+    "Chrome",
+    "Firefox",
+    "Edge"
+]
+
 selected_browsers = st.multiselect(
     "Select browsers to test:",
     options=available_browsers,
-    default=available_browsers
+    default=["Chrome", "Firefox"] # Default to the most likely to succeed
 )
 
 if st.button("Analyze Website Performance"):
@@ -103,7 +116,6 @@ if st.button("Analyze Website Performance"):
     elif not selected_browsers:
         st.warning("Please select at least one browser to test.")
     else:
-        # **NEW: List to hold results for final comparison**
         all_results_for_comparison = []
 
         for browser in selected_browsers:
@@ -117,7 +129,6 @@ if st.button("Analyze Website Performance"):
                 st.error(f"Could not complete analysis on {browser}: {result['Error']}")
                 continue
 
-            # **NEW: Store the main metrics for the summary plot**
             all_results_for_comparison.append({
                 "Browser": browser,
                 "Total Page Load Time (ms)": result.get("Total Page Load Time (ms)", 0),
@@ -125,13 +136,11 @@ if st.button("Analyze Website Performance"):
                 "Frontend Performance (ms)": result.get("Frontend Performance (ms)", 0),
             })
 
-            # Display individual metrics for the current browser
             col1, col2, col3 = st.columns(3)
             col1.metric("Time to First Byte (TTFB)", f"{result.get('Time to First Byte (ms)', 0)} ms")
             col2.metric("Frontend Processing", f"{result.get('Frontend Performance (ms)', 0)} ms")
             col3.metric("Total Load Time", f"{result.get('Total Page Load Time (ms)', 0)} ms")
 
-            # Display resource analysis for the current browser
             if result.get("Resource Data"):
                 df = pd.DataFrame(result["Resource Data"])
                 if not df.empty:
@@ -143,14 +152,12 @@ if st.button("Analyze Website Performance"):
                     slowest_resources = df.sort_values(by="Duration (ms)", ascending=False).head(5)
                     st.dataframe(slowest_resources[["Name", "Type", "Duration (ms)"]].style.format({"Duration (ms)": "{:.2f}"}))
 
-        # --- **NEW: Browser Comparison Section** ---
+        # --- Browser Comparison Section ---
         if len(all_results_for_comparison) > 1:
             st.markdown("---")
             st.header("📊 Browser Performance Comparison")
             
-            # Convert the collected results into a DataFrame
-            comparison_df = pd.DataFrame(all_results_for_comparison)
-            comparison_df = comparison_df.set_index("Browser")
+            comparison_df = pd.DataFrame(all_results_for_comparison).set_index("Browser")
             
             st.markdown("This chart compares the key performance metrics across the selected browsers. Lower is better.")
             st.bar_chart(comparison_df)
