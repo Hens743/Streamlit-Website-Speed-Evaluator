@@ -1,4 +1,3 @@
-# Essential dependencies for headless browsers on Debian
 ffmpeg
 libsm6
 libxext6
