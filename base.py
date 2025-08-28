@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
+from datetime import datetime
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options as ChromeOptions
 from selenium.webdriver.firefox.options import Options as FirefoxOptions
@@ -118,7 +119,8 @@ if st.button("Analyze Website Performance"):
     elif not selected_browsers:
         st.warning("Please select at least one browser.")
     else:
-        all_results_for_comparison = []
+        # UPDATED: Store the full results for each browser for the final report
+        all_results_data = []
 
         for browser in selected_browsers:
             st.markdown("---")
@@ -128,13 +130,11 @@ if st.button("Analyze Website Performance"):
                 st.error(f"Could not complete analysis: {result['Error']}")
                 continue
 
-            all_results_for_comparison.append({
-                "Browser": browser,
-                "Total Page Load Time (ms)": result.get("Total Page Load Time (ms)", 0),
-                "Time to First Byte (ms)": result.get("Time to First Byte (ms)", 0),
-                "Frontend Performance (ms)": result.get("Frontend Performance (ms)", 0),
-            })
+            # Add browser name to result and append to our list
+            result['browser'] = browser
+            all_results_data.append(result)
             
+            # --- UI Display Code (same as before) ---
             st.subheader("Core Metrics")
             col1, col2 = st.columns(2)
             with col1:
@@ -151,37 +151,62 @@ if st.button("Analyze Website Performance"):
             col3.metric("Frontend Processing", f"{result.get('Frontend Performance (ms)', 0)} ms")
             
             st.subheader("Resource Analysis")
-            if result.get("Resource Data"):
-                df = pd.DataFrame(result["Resource Data"])
-                if not df.empty:
-                    with st.expander("📊 View Resource Load Contribution by Type"):
-                        type_summary = df.groupby("Type")["Duration (ms)"].sum()
-                        fig = go.Figure(data=[go.Pie(labels=type_summary.index, values=type_summary.values, hole=.4,
-                                                     hovertemplate="%{label}: <br>%{value:.0f} ms (%{percent})")])
-                        fig.update_layout(showlegend=True, title_text='Contribution to Load Time by Resource Type')
-                        # UPDATED: Replaced use_container_width with width
-                        st.plotly_chart(fig, width='stretch')
+            df = pd.DataFrame(result["Resource Data"])
+            if not df.empty:
+                with st.expander("📊 View Resource Load Contribution by Type"):
+                    type_summary = df.groupby("Type")["Duration (ms)"].sum()
+                    fig = go.Figure(data=[go.Pie(labels=type_summary.index, values=type_summary.values, hole=.4, hovertemplate="%{label}: <br>%{value:.0f} ms (%{percent})")])
+                    fig.update_layout(showlegend=True, title_text='Contribution to Load Time by Resource Type')
+                    st.plotly_chart(fig, use_container_width=True)
 
-                    with st.expander("📜 View Top 30 Slowest Resources with Optimization Tips", expanded=True):
-                        slowest_resources = df.sort_values(by="Duration (ms)", ascending=False).head(30)
-                        ratings_tips = slowest_resources.apply(get_resource_rating_and_tip, axis=1, result_type='expand')
-                        slowest_resources[['Rating', 'Optimization Tip']] = ratings_tips
-                        # UPDATED: Replaced use_container_width with width
-                        st.dataframe(slowest_resources[["Name", "Type", "Duration (ms)", "Size (KB)", "Rating", "Optimization Tip"]],
-                                     width='stretch', hide_index=True,
-                                     column_config={
-                                         "Duration (ms)": st.column_config.NumberColumn(format="%d ms"),
-                                         "Size (KB)": st.column_config.NumberColumn(format="%.1f KB")
-                                     })
+                with st.expander("📜 View Top 30 Slowest Resources with Optimization Tips", expanded=True):
+                    slowest_resources = df.sort_values(by="Duration (ms)", ascending=False).head(30)
+                    ratings_tips = slowest_resources.apply(get_resource_rating_and_tip, axis=1, result_type='expand')
+                    slowest_resources[['Rating', 'Optimization Tip']] = ratings_tips
+                    st.dataframe(slowest_resources[["Name", "Type", "Duration (ms)", "Size (KB)", "Rating", "Optimization Tip"]],
+                                 width='stretch', hide_index=True,
+                                 column_config={"Duration (ms)": st.column_config.NumberColumn(format="%d ms"), "Size (KB)": st.column_config.NumberColumn(format="%.1f KB")})
 
-        if len(all_results_for_comparison) > 1:
+        # --- Final Comparison Section ---
+        if len(all_results_data) > 1:
             st.markdown("---")
             st.header("📊 Final Browser Performance Comparison")
-            comparison_df = pd.DataFrame(all_results_for_comparison).set_index("Browser")
-            
+            comparison_df = pd.DataFrame([{
+                "Browser": res["browser"],
+                "Total Page Load Time (ms)": res.get("Total Page Load Time (ms)", 0),
+                "Time to First Byte (ms)": res.get("Time to First Byte (ms)", 0),
+                "Frontend Performance (ms)": res.get("Frontend Performance (ms)", 0)
+            } for res in all_results_data]).set_index("Browser")
             st.markdown("This table compares key metrics across browsers. **Green is faster (better)**, Red is slower (worse).")
-            
             styled_df = comparison_df.style.background_gradient(cmap='RdYlGn_r', axis=0)
-            
-            # UPDATED: Replaced use_container_width with width
             st.dataframe(styled_df, width='stretch')
+
+        # NEW: AI-Ready Technical Report Section
+        if all_results_data:
+            st.markdown("---")
+            with st.expander("📋 AI-Ready Technical Report"):
+                report_string = f"# Technical Performance Report for {url}\n"
+                report_string += f"**Analysis Date:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
+                report_string += f"**Browsers Tested:** {', '.join(selected_browsers)}\n\n"
+
+                for res in all_results_data:
+                    report_string += f"## Analysis for {res['browser']}\n"
+                    report_string += "**Core Metrics:**\n"
+                    report_string += f"- Time to First Byte (TTFB): {res.get('Time to First Byte (ms)', 0)} ms\n"
+                    report_string += f"- Total Page Load Time: {res.get('Total Page Load Time (ms)', 0)} ms\n"
+                    report_string += f"- DNS Lookup: {res.get('DNS Lookup Time (ms)', 0)} ms\n"
+                    report_string += f"- TCP Connection: {res.get('TCP Connection Time (ms)', 0)} ms\n"
+                    report_string += f"- Frontend Processing: {res.get('Frontend Performance (ms)', 0)} ms\n\n"
+                    
+                    report_string += "**Resource Analysis:**\n"
+                    df = pd.DataFrame(res["Resource Data"])
+                    if not df.empty:
+                        report_string += f"- Total Resources Loaded: {len(df)}\n"
+                        slowest_resources = df.sort_values(by="Duration (ms)", ascending=False).head(5)
+                        report_string += "- **Top 5 Slowest Resources (Potential Bottlenecks):**\n"
+                        for i, row in slowest_resources.iterrows():
+                            _, tip = get_resource_rating_and_tip(row)
+                            report_string += f"  1. **{row['Name']}** ({row['Type']}) - **Load Time:** {row['Duration (ms):.0f} ms, **Size:** {row['Size (KB)']:.1f} KB. **Suggestion:** {tip}\n"
+                    report_string += "\n"
+                
+                st.text_area("Copy this report to feed to a language model for improvement advice:", report_string, height=400)
