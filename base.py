@@ -1,12 +1,13 @@
 import streamlit as st
 import pandas as pd
+import plotly.graph_objects as go
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options as ChromeOptions
 from selenium.webdriver.firefox.options import Options as FirefoxOptions
 from selenium.webdriver.edge.options import Options as EdgeOptions
 from urllib.parse import urlparse
 
-# --- Helper Functions ---
+# --- Helper Functions (no changes) ---
 
 def is_valid_url(url):
     """Checks if the provided string is a valid URL."""
@@ -17,7 +18,7 @@ def is_valid_url(url):
         return False
 
 def get_resource_rating_and_tip(row):
-    """Analyzes a resource (DataFrame row) and returns a rating and optimization tip."""
+    """Analyzes a resource and returns a rating and optimization tip."""
     res_type, duration, size = row["Type"], row["Duration (ms)"], row["Size (KB)"]
     rating, tip = "Good ✅", "No action needed."
 
@@ -39,11 +40,10 @@ def get_resource_rating_and_tip(row):
     
     return rating, tip
 
-# --- Core Selenium Logic with Caching ---
+# --- Core Selenium Logic (no changes) ---
 
 @st.cache_data
 def get_website_speed(url, browser_name):
-    """Measures the page load time and resource loading performance of a website."""
     driver = None
     try:
         headless_options = ["--headless", "--no-sandbox", "--disable-dev-shm-usage", "--disable-gpu", "--window-size=1920,1080"]
@@ -118,7 +118,6 @@ if st.button("Analyze Website Performance"):
     elif not selected_browsers:
         st.warning("Please select at least one browser.")
     else:
-        # RE-ADDED: List to hold results for final comparison
         all_results_for_comparison = []
 
         for browser in selected_browsers:
@@ -129,7 +128,6 @@ if st.button("Analyze Website Performance"):
                 st.error(f"Could not complete analysis: {result['Error']}")
                 continue
 
-            # RE-ADDED: Store results for the final comparison plot
             all_results_for_comparison.append({
                 "Browser": browser,
                 "Total Page Load Time (ms)": result.get("Total Page Load Time (ms)", 0),
@@ -137,7 +135,6 @@ if st.button("Analyze Website Performance"):
                 "Frontend Performance (ms)": result.get("Frontend Performance (ms)", 0),
             })
             
-            # --- Display Metrics with Popover Benchmarks ---
             st.subheader("Core Metrics")
             col1, col2 = st.columns(2)
             with col1:
@@ -147,22 +144,23 @@ if st.button("Analyze Website Performance"):
                 st.metric("Total Page Load Time", f"{result.get('Total Page Load Time (ms)', 0)} ms")
                 with st.popover("ℹ️", use_container_width=True): st.markdown("**Excellent:** < 2000 ms, **Good:** 2001-2500 ms, **Needs Improvement:** 2501-4000 ms, **Poor:** > 4000 ms")
 
-            # RE-ADDED: Detailed connection and frontend metrics
             st.subheader("Performance Breakdown")
             col1, col2, col3 = st.columns(3)
             col1.metric("DNS Lookup", f"{result.get('DNS Lookup Time (ms)', 0)} ms")
             col2.metric("TCP Connection", f"{result.get('TCP Connection Time (ms)', 0)} ms")
             col3.metric("Frontend Processing", f"{result.get('Frontend Performance (ms)', 0)} ms")
             
-            # --- Display Resource Analysis with NEW Smart Table ---
             st.subheader("Resource Analysis")
             if result.get("Resource Data"):
                 df = pd.DataFrame(result["Resource Data"])
                 if not df.empty:
-                    # RE-ADDED: Bar chart for resource types
-                    with st.expander("📊 View Resource Load Time by Type"):
-                        type_summary = df.groupby("Type")["Duration (ms)"].sum().sort_values(ascending=False)
-                        st.bar_chart(type_summary)
+                    # UPDATED: Replaced bar chart with a donut chart
+                    with st.expander("📊 View Resource Load Contribution by Type"):
+                        type_summary = df.groupby("Type")["Duration (ms)"].sum()
+                        fig = go.Figure(data=[go.Pie(labels=type_summary.index, values=type_summary.values, hole=.4,
+                                                     hovertemplate="%{label}: <br>%{value:.0f} ms (%{percent})")])
+                        fig.update_layout(showlegend=True, title_text='Contribution to Load Time by Resource Type')
+                        st.plotly_chart(fig, use_container_width=True)
 
                     with st.expander("📜 View Top 30 Slowest Resources with Optimization Tips", expanded=True):
                         slowest_resources = df.sort_values(by="Duration (ms)", ascending=False).head(30)
@@ -175,10 +173,15 @@ if st.button("Analyze Website Performance"):
                                          "Size (KB)": st.column_config.NumberColumn(format="%.1f KB")
                                      })
 
-        # RE-ADDED: Final Browser Comparison Chart Section
+        # UPDATED: Replaced bar chart with a styled table (heatmap)
         if len(all_results_for_comparison) > 1:
             st.markdown("---")
             st.header("📊 Final Browser Performance Comparison")
             comparison_df = pd.DataFrame(all_results_for_comparison).set_index("Browser")
-            st.markdown("This chart compares key metrics across browsers. Lower is better.")
-            st.bar_chart(comparison_df)
+            
+            st.markdown("This table compares key metrics across browsers. **Green is faster (better)**, Red is slower (worse).")
+            
+            # Apply a background gradient style. Lower values are better (green).
+            styled_df = comparison_df.style.background_gradient(cmap='RdYlGn_r', axis=0)
+            
+            st.dataframe(styled_df, use_container_width=True)
