@@ -1,1 +1,14 @@
-
+# Essential dependencies for headless browsers on Debian
+ffmpeg
+libsm6
+libxext6
+libgl1-mesa-glx
+libglib2.0-0
+libnss3
+libdbus-glib-1-2
+libgconf-2-4
+libfontconfig1
+libxrender1
+libx11-6
+libxt6
+libgtk-3-0
