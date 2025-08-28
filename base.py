@@ -154,26 +154,26 @@ if st.button("Analyze Website Performance"):
             if result.get("Resource Data"):
                 df = pd.DataFrame(result["Resource Data"])
                 if not df.empty:
-                    # UPDATED: Replaced bar chart with a donut chart
                     with st.expander("📊 View Resource Load Contribution by Type"):
                         type_summary = df.groupby("Type")["Duration (ms)"].sum()
                         fig = go.Figure(data=[go.Pie(labels=type_summary.index, values=type_summary.values, hole=.4,
                                                      hovertemplate="%{label}: <br>%{value:.0f} ms (%{percent})")])
                         fig.update_layout(showlegend=True, title_text='Contribution to Load Time by Resource Type')
-                        st.plotly_chart(fig, use_container_width=True)
+                        # UPDATED: Replaced use_container_width with width
+                        st.plotly_chart(fig, width='stretch')
 
                     with st.expander("📜 View Top 30 Slowest Resources with Optimization Tips", expanded=True):
                         slowest_resources = df.sort_values(by="Duration (ms)", ascending=False).head(30)
                         ratings_tips = slowest_resources.apply(get_resource_rating_and_tip, axis=1, result_type='expand')
                         slowest_resources[['Rating', 'Optimization Tip']] = ratings_tips
+                        # UPDATED: Replaced use_container_width with width
                         st.dataframe(slowest_resources[["Name", "Type", "Duration (ms)", "Size (KB)", "Rating", "Optimization Tip"]],
-                                     use_container_width=True, hide_index=True,
+                                     width='stretch', hide_index=True,
                                      column_config={
                                          "Duration (ms)": st.column_config.NumberColumn(format="%d ms"),
                                          "Size (KB)": st.column_config.NumberColumn(format="%.1f KB")
                                      })
 
-        # UPDATED: Replaced bar chart with a styled table (heatmap)
         if len(all_results_for_comparison) > 1:
             st.markdown("---")
             st.header("📊 Final Browser Performance Comparison")
@@ -181,7 +181,7 @@ if st.button("Analyze Website Performance"):
             
             st.markdown("This table compares key metrics across browsers. **Green is faster (better)**, Red is slower (worse).")
             
-            # Apply a background gradient style. Lower values are better (green).
             styled_df = comparison_df.style.background_gradient(cmap='RdYlGn_r', axis=0)
             
-            st.dataframe(styled_df, use_container_width=True)
+            # UPDATED: Replaced use_container_width with width
+            st.dataframe(styled_df, width='stretch')
