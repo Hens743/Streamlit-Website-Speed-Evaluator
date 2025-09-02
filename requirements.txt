@@ -3,3 +3,4 @@ selenium
 pandas
 plotly
 matplotlib
+Authlib
